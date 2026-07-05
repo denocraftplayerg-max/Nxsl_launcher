@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      architectures:
+        description: 'JSON array of architectures to build (default: all)'
+        required: true
+        default: '["all", "arm", "arm64", "x86", "x86_64"]'
+        type: string
 
 jobs:
   BuildRelease:
@@ -11,7 +17,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        arch: [ "all", "arm", "arm64", "x86", "x86_64" ]
+        arch: ${{ fromJson(github.event.inputs.architectures || '["all", "arm", "arm64", "x86", "x86_64"]') }}
       fail-fast: false
 
     env:
@@ -66,7 +72,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        arch: [ "all", "arm", "arm64", "x86", "x86_64" ]
+        arch: ${{ fromJson(github.event.inputs.architectures || '["all", "arm", "arm64", "x86", "x86_64"]') }}
       fail-fast: false
 
     steps:
