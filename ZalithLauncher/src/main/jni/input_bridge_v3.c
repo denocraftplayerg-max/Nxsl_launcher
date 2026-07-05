@@ -31,8 +31,10 @@
 #define EVENT_TYPE_MOUSE_BUTTON 1006
 #define EVENT_TYPE_SCROLL 1007
 #define EVENT_TYPE_WINDOW_SIZE 1008
+#define GLFW_WINDOW_ATTR_FOCUSED 0x20001
 
 static void registerFunctions(JNIEnv *env);
+static void setWindowAttribJava(JNIEnv *env, jlong window, jint attrib, jint value);
 
 jint JNI_OnLoad(JavaVM* vm, __attribute__((unused)) void* reserved) {
     if (pojav_environ->dalvikJavaVMPtr == NULL) {
@@ -69,6 +71,9 @@ jint JNI_OnLoad(JavaVM* vm, __attribute__((unused)) void* reserved) {
         registerFunctions(env);
     }
     pojav_environ->isGrabbing = JNI_FALSE;
+    pojav_environ->isCursorEntered = JNI_FALSE;
+    pojav_environ->shouldUpdateCursorEnter = JNI_FALSE;
+    pojav_environ->windowFocused = 0;
     
     return JNI_VERSION_1_4;
 }
@@ -97,6 +102,11 @@ void handleFramebufferSizeJava(long window, int w, int h) {
 }
 
 void pojavPumpEvents(void* window) {
+    if (pojav_environ->shouldUpdateCursorEnter && pojav_environ->GLFW_invoke_CursorEnter) {
+        pojav_environ->GLFW_invoke_CursorEnter(window, 1);
+        pojav_environ->shouldUpdateCursorEnter = JNI_FALSE;
+    }
+
     if(pojav_environ->shouldUpdateMouse) {
         pojav_environ->GLFW_invoke_CursorPos(window, floor(pojav_environ->cursorX),
                                              floor(pojav_environ->cursorY));
@@ -173,6 +183,7 @@ void pojavStopPumping() {
     atomic_fetch_sub_explicit(&pojav_environ->eventCounter, pojav_environ->inEventCount, memory_order_acquire);
     // Make sure the next frame won't send mouse updates if it's unnecessary
     pojav_environ->shouldUpdateMouse = false;
+    pojav_environ->shouldUpdateCursorEnter = false;
 }
 
 JNIEXPORT void JNICALL
@@ -365,13 +376,11 @@ void critical_send_cursor_pos(jfloat x, jfloat y) {
         LOGD("pojav_environ->GLFW_invoke_CursorPos && pojav_environ->isInputReady \n");
 #endif
         if (!pojav_environ->isCursorEntered) {
-            if (pojav_environ->GLFW_invoke_CursorEnter) {
-                pojav_environ->isCursorEntered = true;
-                if (pojav_environ->isUseStackQueueCall) {
-                    sendData(EVENT_TYPE_CURSOR_ENTER, 1, 0, 0, 0);
-                } else {
-                    pojav_environ->GLFW_invoke_CursorEnter((void*) pojav_environ->showingWindow, 1);
-                }
+            pojav_environ->isCursorEntered = JNI_TRUE;
+            if (pojav_environ->isUseStackQueueCall) {
+                pojav_environ->shouldUpdateCursorEnter = JNI_TRUE;
+            } else if (pojav_environ->GLFW_invoke_CursorEnter) {
+                pojav_environ->GLFW_invoke_CursorEnter((void*) pojav_environ->showingWindow, 1);
             }
         }
 
@@ -463,9 +472,19 @@ void noncritical_send_scroll(__attribute__((unused)) JNIEnv* env, __attribute__(
 
 JNIEXPORT void JNICALL Java_org_lwjgl_glfw_GLFW_nglfwSetShowingWindow(__attribute__((unused)) JNIEnv* env, __attribute__((unused)) jclass clazz, jlong window) {
     pojav_environ->showingWindow = (long) window;
+    pojav_environ->isCursorEntered = JNI_FALSE;
+    pojav_environ->shouldUpdateCursorEnter = JNI_FALSE;
+    pojav_environ->shouldUpdateMouse = JNI_FALSE;
+    if (window != 0) {
+        setWindowAttribJava(env, window, GLFW_WINDOW_ATTR_FOCUSED, pojav_environ->windowFocused);
+    }
 }
 
 JNIEXPORT void JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeSetWindowAttrib(__attribute__((unused)) JNIEnv* env, __attribute__((unused)) jclass clazz, jint attrib, jint value) {
+    if (attrib == GLFW_WINDOW_ATTR_FOCUSED) {
+        pojav_environ->windowFocused = value;
+    }
+
     // Check for stack queue no longer necessary here as the JVM crash's origin is resolved
     if (!pojav_environ->showingWindow) {
         // If the window is not shown, there is nothing to do yet.
@@ -488,13 +507,20 @@ JNIEXPORT void JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeSetWindowAttrib(
         printf("input_bridge nativeSetWindowAttrib() JNI call failed: %i\n", env_result);
         return;
     }
-    (*jvm_env)->CallStaticVoidMethod(
-            jvm_env, pojav_environ->vmGlfwClass,
-            pojav_environ->method_glftSetWindowAttrib,
-            (jlong) pojav_environ->showingWindow, attrib, value
-    );
+    setWindowAttribJava(jvm_env, (jlong) pojav_environ->showingWindow, attrib, value);
 
     // Attaching every time is annoying, so stick the attachment to the Android GUI thread around
+}
+
+static void setWindowAttribJava(JNIEnv *env, jlong window, jint attrib, jint value) {
+    (*env)->CallStaticVoidMethod(
+            env,
+            pojav_environ->vmGlfwClass,
+            pojav_environ->method_glftSetWindowAttrib,
+            window,
+            attrib,
+            value
+    );
 }
 const static JNINativeMethod critical_fcns[] = {
         {"nativeSetUseInputStackQueue", "(Z)V", critical_set_stackqueue},

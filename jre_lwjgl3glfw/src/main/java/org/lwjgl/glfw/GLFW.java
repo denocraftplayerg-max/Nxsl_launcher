@@ -933,7 +933,12 @@ public class GLFW
     }
 
     public static void glfwSetWindowAttrib(@NativeType("GLFWwindow *") long window, int attrib, int value) {
-        internalGetWindow(window).windowAttribs.put(attrib, value);
+        GLFWWindowProperties win = internalGetWindow(window);
+        int previousValue = win.windowAttribs.getOrDefault(attrib, 0);
+        win.windowAttribs.put(attrib, value);
+        if (attrib == GLFW_FOCUSED && previousValue != value && mGLFWWindowFocusCallback != null) {
+            mGLFWWindowFocusCallback.invoke(window, value != 0);
+        }
     }
 
     public static void glfwGetVersion(IntBuffer major, IntBuffer minor, IntBuffer rev) {
