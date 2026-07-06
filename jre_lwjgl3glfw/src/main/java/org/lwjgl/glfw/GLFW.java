@@ -772,6 +772,16 @@ public class GLFW
         GLFWWindowFocusCallback lastCallback = mGLFWWindowFocusCallback;
         if (cbfun == null) mGLFWWindowFocusCallback = null;
         else mGLFWWindowFocusCallback = GLFWWindowFocusCallback.create(cbfun);
+        // If the callback is registered after the focus attribute has already been set,
+        // deliver the current focus state immediately so ImGui/Axiom never misses the
+        // initial focus event.
+        if (lastCallback == null && mGLFWWindowFocusCallback != null) {
+            GLFWWindowProperties win = internalGetWindow(window);
+            Integer focused = win != null ? win.windowAttribs.get(GLFW_FOCUSED) : null;
+            if (focused != null) {
+                mGLFWWindowFocusCallback.invoke(window, focused != 0);
+            }
+        }
         return lastCallback;
     }
 
@@ -1131,6 +1141,12 @@ public class GLFW
         win.windowAttribs.put(GLFW_HOVERED, 1);
         win.windowAttribs.put(GLFW_VISIBLE, 1);
         nglfwSetShowingWindow(window);
+        // After the showing window changes, native code resets cursor-enter state.
+        // Re-send the last cursor position so ImGui/Axiom gets a cursor-enter event
+        // even if the user keeps the finger still on the freshly shown window.
+        if (mGLFWIsInputReady && (CallbackBridge.mouseX != 0 || CallbackBridge.mouseY != 0)) {
+            CallbackBridge.sendCursorPos(CallbackBridge.mouseX, CallbackBridge.mouseY);
+        }
     }
 
     public static void glfwHideWindow(long window) {
@@ -1173,6 +1189,7 @@ public class GLFW
     public static void glfwSetWindowIcon(@NativeType("GLFWwindow *") long window, @Nullable @NativeType("GLFWimage const *") GLFWImage.Buffer images) {}
 
     public static void glfwPollEvents() {
+        boolean wasInputReady = mGLFWIsInputReady;
         if (!mGLFWIsInputReady) {
             mGLFWIsInputReady = true;
             CallbackBridge.nativeSetInputReady(true);
@@ -1182,6 +1199,12 @@ public class GLFW
         // Prevent these with this code.
         if(mGLFWInputPumping) return;
         mGLFWInputPumping = true;
+        // If input just became ready, re-deliver the last known cursor position so that
+        // a cursor-enter event is emitted for ImGui/Axiom even if the first touch arrived
+        // before glfwPollEvents() was ever called.
+        if (!wasInputReady && (CallbackBridge.mouseX != 0 || CallbackBridge.mouseY != 0)) {
+            CallbackBridge.sendCursorPos(CallbackBridge.mouseX, CallbackBridge.mouseY);
+        }
         callV(Functions.StartPumping);
         for (Long ptr : mGLFWWindowMap.keySet()) callJV(ptr, Functions.PumpEvents);
         callV(Functions.StopPumping);
