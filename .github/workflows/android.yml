@@ -6,8 +6,47 @@ on:
   workflow_dispatch:
 
 jobs:
+  UpdateJreJar:
+    if: github.repository_owner == 'ZalithLauncher' && github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build JRE JAR files
+        run: |
+          chmod +x gradlew
+          ./gradlew jre_lwjgl3glfw:build --no-daemon
+
+      - name: Commit updated JAR if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ZalithLauncher/src/main/assets/components/lwjgl3/lwjgl-glfw-classes.jar
+          git add ZalithLauncher/src/main/assets/components/lwjgl3/version
+          if git diff --cached --quiet; then
+            echo "No JAR changes to commit"
+          else
+            git commit -m "[ci skip] Update lwjgl-glfw-classes.jar"
+            git push
+          fi
+
   BuildRelease:
-    if: github.repository_owner == 'ZalithLauncher' && !startsWith(github.ref, 'refs/pull/') && github.ref_name == 'main'
+    needs: UpdateJreJar
+    if: |
+      !failure() && !cancelled() &&
+      (needs.UpdateJreJar.result == 'success' || needs.UpdateJreJar.result == 'skipped') &&
+      github.repository_owner == 'ZalithLauncher' &&
+      !startsWith(github.ref, 'refs/pull/') &&
+      github.ref_name == 'main'
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -62,7 +101,11 @@ jobs:
           path: ZalithLauncher/build/outputs/apk/release/*
 
   BuildDebug:
-    if: startsWith(github.ref, 'refs/pull/') || github.ref_name != 'main'
+    needs: UpdateJreJar
+    if: |
+      !failure() && !cancelled() &&
+      (needs.UpdateJreJar.result == 'success' || needs.UpdateJreJar.result == 'skipped') &&
+      (startsWith(github.ref, 'refs/pull/') || github.ref_name != 'main')
     runs-on: ubuntu-22.04
     strategy:
       matrix:
