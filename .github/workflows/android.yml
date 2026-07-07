@@ -7,7 +7,7 @@ on:
 
 jobs:
   UpdateJreJar:
-    if: github.repository_owner == 'ZalithLauncher' && github.event_name == 'push'
+    if: github.event_name == 'push'
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -44,7 +44,6 @@ jobs:
     if: |
       !failure() && !cancelled() &&
       (needs.UpdateJreJar.result == 'success' || needs.UpdateJreJar.result == 'skipped') &&
-      github.repository_owner == 'ZalithLauncher' &&
       !startsWith(github.ref, 'refs/pull/') &&
       github.ref_name == 'main'
     runs-on: ubuntu-22.04
