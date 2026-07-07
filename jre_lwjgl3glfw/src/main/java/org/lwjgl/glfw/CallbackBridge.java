@@ -43,8 +43,18 @@ public class CallbackBridge {
         nativeSendData(false, type, data);
     }
     public static native void nativeSendData(boolean isAndroid, int type, String data);
+    // Last reported cursor position, mirrored from the Android-side CallbackBridge.
+    public static float mouseX, mouseY;
+
+    public static void sendCursorPos(float x, float y) {
+        mouseX = x;
+        mouseY = y;
+        nativeSendCursorPos(x, y);
+    }
+
     public static native boolean nativeSetInputReady(boolean ready);
     public static native String nativeClipboard(int action, byte[] copy);
     public static native void nativeSetGrabbing(boolean grab);
+    public static native void nativeSendCursorPos(float x, float y);
 }
 

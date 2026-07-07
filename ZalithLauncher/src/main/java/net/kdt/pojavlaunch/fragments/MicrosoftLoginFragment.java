@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.WebSettings;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
@@ -56,6 +57,15 @@ public class MicrosoftLoginFragment extends BaseFragment {
     private void setWebViewSettings() {
         WebSettings settings = binding.webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        // Microsoft login page sometimes rejects mobile/embedded WebView user agents.
+        // Spoof a recent desktop Edge/Chrome UA so the login form renders normally.
+        settings.setUserAgentString(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                "Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0"
+        );
+        settings.setDomStorageEnabled(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
         binding.webView.setWebViewClient(new WebViewTrackClient());
         mBlankClient = false;
     }
@@ -125,6 +135,13 @@ public class MicrosoftLoginFragment extends BaseFragment {
 
     /** Client to track when to sent the data to the launcher */
     class WebViewTrackClient extends WebViewClient {
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            // Modern Android calls this overload; delegate to the legacy String overload
+            // so both paths behave identically.
+            return shouldOverrideUrlLoading(view, request.getUrl().toString());
+        }
+
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
             if (url.startsWith("ms-xal-00000000402b5328")) {
