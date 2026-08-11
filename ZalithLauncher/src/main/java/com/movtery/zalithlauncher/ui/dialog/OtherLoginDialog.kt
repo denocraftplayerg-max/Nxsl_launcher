@@ -73,9 +73,38 @@ class OtherLoginDialog(
                         return
                     }
 
-                    OtherLoginHelper(server.baseUrl, server.serverName, email, password, listener).createNewAccount(context)
+                    // Create a wrapper listener that dismisses the dialog after account creation
+                    val wrappedListener = object : OtherLoginHelper.OnLoginListener {
+                        override fun onLoading() {
+                            // Disable buttons during account creation to prevent interference
+                            loginButton.isEnabled = false
+                            cancelButton.isEnabled = false
+                            listener.onLoading()
+                        }
 
-                    dismiss()
+                        override fun unLoading() {
+                            // Re-enable buttons
+                            loginButton.isEnabled = true
+                            cancelButton.isEnabled = true
+                            listener.unLoading()
+                        }
+
+                        override fun onSuccess(account: net.kdt.pojavlaunch.value.MinecraftAccount) {
+                            // Dismiss dialog only after successful account creation
+                            dismiss()
+                            listener.onSuccess(account)
+                        }
+
+                        override fun onFailed(error: String) {
+                            // Keep dialog open on failure so user can retry
+                            loginButton.isEnabled = true
+                            cancelButton.isEnabled = true
+                            listener.onFailed(error)
+                        }
+                    }
+
+                    // Create account without immediate dismiss - dialog stays open during process
+                    OtherLoginHelper(server.baseUrl, server.serverName, email, password, wrappedListener).createNewAccount(context)
                 }
             }
         }
