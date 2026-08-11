@@ -104,7 +104,8 @@ public class LoggerView extends ConstraintLayout {
                     binding.scroll.setKeepFocusing(isChecked);
                 }
         );
-        binding.toggleAutoscroll.setChecked(true);
+        // Auto-scroll is now OFF by default - users can toggle it manually
+        binding.toggleAutoscroll.setChecked(false);
 
         // Listen to logs
         mLogListener = text -> {
