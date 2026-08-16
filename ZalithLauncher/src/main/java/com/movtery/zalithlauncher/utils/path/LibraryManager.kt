@@ -119,14 +119,14 @@ class LibraryManager {
             if (customLibs.isNotEmpty()) {
                 Logging.i("LibraryManager", "Custom libraries found: ${customLibs.size}")
                 customLibs.forEach { 
-                    Logging.d("LibraryManager", "  - ${it.name} (${it.length} bytes)")
+                    Logging.d("LibraryManager", "  - \( {it.name} ( \){it.length()} bytes)")
                 }
             }
             
             if (customRenderers.isNotEmpty()) {
                 Logging.i("LibraryManager", "Custom renderers found: ${customRenderers.size}")
                 customRenderers.forEach { 
-                    Logging.d("LibraryManager", "  - ${it.name} (${it.length} bytes)")
+                    Logging.d("LibraryManager", "  - \( {it.name} ( \){it.length()} bytes)")
                 }
             }
         }
