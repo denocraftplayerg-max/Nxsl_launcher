@@ -10,13 +10,14 @@ import com.movtery.zalithlauncher.utils.path.UrlManager
 
 class LocalAccountUtils {
     companion object {
+        /**
+         * Offline accounts are always allowed.
+         * Microsoft account is optional (not required).
+         */
         @JvmStatic
         fun checkUsageAllowed(listener: CheckResultListener) {
-            if (AccountsManager.hasMicrosoftAccount()) {
-                listener.onUsageAllowed()
-            } else {
-                listener.onUsageDenied()
-            }
+            // Always allow offline / local accounts. Microsoft is optional.
+            listener.onUsageAllowed()
         }
 
         @JvmStatic
