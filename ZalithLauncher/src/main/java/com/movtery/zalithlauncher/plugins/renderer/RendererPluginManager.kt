@@ -94,9 +94,11 @@ object RendererPluginManager {
     fun parseApkPlugin(context: Context, info: ApplicationInfo) {
         if (info.flags and ApplicationInfo.FLAG_SYSTEM == 0) {
             val metaData = info.metaData ?: return
+            val isQngPlugin = metaData.getBoolean("qngPlugin", false)
             if (
                 metaData.getBoolean("fclPlugin", false) ||
-                metaData.getBoolean("zalithRendererPlugin", false)
+                metaData.getBoolean("zalithRendererPlugin", false) ||
+                isQngPlugin
             ) {
                 val rendererString = metaData.getString("renderer") ?: return
                 val des = metaData.getString("des") ?: return
@@ -123,6 +125,14 @@ object RendererPluginManager {
                             else -> envList[key] = value
                         }
                     }
+                }
+
+                // QUANNEGGAES4D bundles its ANGLE libraries inside the plugin APK.
+                // The game process cannot reliably resolve another APK's native
+                // library directory by soname alone, so expose the exact directory
+                // to the renderer when this plugin declares qngPlugin.
+                if (isQngPlugin) {
+                    envList["QNG_ANGLE_DIR"] = nativeLibraryDir
                 }
 
                 val packageName = info.packageName
